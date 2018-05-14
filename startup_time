@@ -1,0 +1,156 @@
+#!/bin/bash
+package=""
+activity=""
+testTimes=1
+totalTestTimes=10
+totalTime=0
+lock=""
+modeReg="ActivityManager: Fully drawn"
+
+stopApp() {
+	adb shell am force-stop $1 >/dev/null
+}
+
+startApp() {
+	adb shell am start $1 >/dev/null
+}
+
+goBack() {
+	adb shell input keyevent KEYCODE_BACK
+}
+
+goHome() {
+	adb shell input keyevent KEYCODE_HOME
+}
+
+getDeviceInfo() {
+	brand=$(adb shell getprop ro.product.brand)
+	echo "Brand: $brand"
+	board=$(adb shell getprop ro.product.board)
+	echo "Board: $board"
+	hardware=$(adb shell getprop ro.hardware)
+	echo "Hardware: $hardware"
+	buildType=$(adb shell getprop ro.build.type)
+	echo "BuildType: $buildType"
+	version=$(adb shell getprop ro.build.display.id)
+	echo "Version: $version"
+	fingerprint=$(adb shell getprop ro.build.fingerprint)
+	echo "Fingerprint: $fingerprint"
+	release=$(adb shell getprop ro.build.version.release)
+	echo "Android Version: $release"
+}
+
+checkPackage() {
+	exists=$(adb shell pm list packages -e|grep "$1$")
+	if [ "$exists" == "" ]
+	then
+		echo "package $1 not found."
+		exit
+	else
+		echo "package $1 found."
+	fi
+}
+
+getAppVersion() {
+	versionName=$(adb shell dumpsys package $1|grep versionName|grep "=.*$" -o|grep "[^=].*$" -o)
+	echo "App Version:$versionName"
+}
+
+getDefaultActivity() {
+	activity=$(adb shell dumpsys package $1|egrep "android\.intent\.action\.MAIN:" -A1|egrep "\S+\s{1}filter" -o|egrep "\S+" -o|head -1)
+	echo "The default activity is $activity"
+}
+
+getPermissions() {
+	adb shell dumpsys package $1|egrep "android\.permission\.[a-zA-Z0-9_]+" -o
+}
+
+turnScreenOn() {
+	adb shell input keyevent KEYCODE_WAKEUP
+}
+
+unlockScreen() {
+	adb shell input keyevent KEYCODE_MENU
+	if [ "$1" == "" ]
+	then
+		echo "unlock screen no password."
+	else
+		adb shell input text $1 && adb shell input keyevent KEYCODE_ENTER
+	fi
+}
+
+powerKey() {
+	adb shell input keyevent KEYCODE_POWER
+}
+
+runFunc() {
+	while read line
+	do
+		if [[ $line = *"$modeReg"* ]]; then 
+			time=$(echo $line|grep $activity| egrep "\+.+ms$" -o|egrep "[0-9]+" -o)
+			if [ "$time" == "" ]
+			then
+				continue
+			fi
+			echo "Test $testTimes: $time ms"
+			totalTime=`expr $totalTime + $time`
+			if [ "$totalTestTimes" == "$testTimes" ]
+			then
+				avgTime=`expr $totalTime / $testTimes`
+				echo "average time: $avgTime ms"
+				break
+			fi
+			testTimes=`expr $testTimes + 1`
+			sleep 1s
+			stopApp $package
+			sleep 2s
+			startApp $activity
+		fi
+	done
+	exit
+}
+
+while getopts "a:p:t:l:id" opt; do  
+  case $opt in  
+    a)
+	  activity=$OPTARG
+      ;;
+	p)
+      package=$OPTARG
+      ;;
+	t)
+      totalTestTimes=$OPTARG
+      ;;
+	l)
+	  lock=$OPTARG
+	  ;;
+	i)
+	  modeReg="ActivityManager: Displayed"
+	  ;;
+	d)
+	  modeReg="ActivityManager: Fully drawn"
+	  ;;
+    \?)  
+      echo "Invalid option: -$OPTARG"   
+      ;;
+  esac
+done  
+
+if [ "$package" == "" ]
+then 
+	echo "No package selected."
+	exit
+fi
+checkPackage $package
+if [ "$activity" == "" ]
+then
+	getDefaultActivity $package
+fi
+
+getAppVersion $package
+getDeviceInfo
+turnScreenOn
+unlockScreen $lock
+stopApp $package
+startApp $activity
+adb logcat|runFunc

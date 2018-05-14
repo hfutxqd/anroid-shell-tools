@@ -1,0 +1,46 @@
+#!/bin/bash
+package=""
+g="n"
+
+getPermissions() {
+	adb shell dumpsys package $1|egrep "android\.permission\.[a-zA-Z0-9_]+" -o
+}
+
+grantPermissions() {
+	permissions=$(cat "${1:-/dev/stdin}")
+	for line in $permissions; do
+		echo "granting $line"
+		res=$(adb shell "pm grant $package $line" 2>&1)
+		if [ "$res" == "" ] ; then
+			echo "Success"
+		else
+			echo "Fail"
+		fi
+	done
+}
+
+while getopts "gp:" opt; do  
+	case $opt in  
+		g)
+		g="y"
+		;;
+		p)
+		package=$OPTARG
+		;;
+		\?)  
+		echo "Invalid option: -$OPTARG"   
+		;;
+	esac
+done  
+
+echo 'clearing data...'
+result=`adb shell pm clear $package`
+success='Success'
+echo $result
+if [[ $result =~ $success ]]
+then 
+	if [[ "$g" == "y" ]]
+	then
+		getPermissions $package|grantPermissions
+	fi
+fi

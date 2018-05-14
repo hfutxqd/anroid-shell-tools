@@ -1,0 +1,35 @@
+#!/bin/bash
+j="n"
+input=""
+output=""
+
+while getopts "ji:o:" opt; do  
+  case $opt in  
+    j)
+        j="y"
+        ;;
+    i)
+        input=$OPTARG
+        ;;
+    o)
+        output=$OPTARG
+        ;;
+    \?)  
+      echo "Invalid option: -$OPTARG"   
+      ;;
+  esac
+done
+if [[ "$output" == "" ]]
+then
+    output="${input%.apk}_signed.apk"
+fi
+
+if [[ "$j" == "y" ]]
+then
+    jarsigner -verbose -keystore ~/.android/debug.keystore -storepass android -keypass android $input androiddebugkey
+else
+    echo android|./apksigner sign  --ks ~/.android/debug.keystore --out $output $input
+fi
+
+
+
