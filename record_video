@@ -1,0 +1,18 @@
+#!/bin/bash
+
+sigint()
+{
+   echo -e "\nstop recording."
+   sleep 2s
+   adb pull /sdcard/tmp.mp4
+   exit 0
+}
+
+trap 'sigint'  INT
+trap ':'       HUP
+echo "start recording."
+echo "The time limit is 3 mins."
+adb shell screenrecord /sdcard/tmp.mp4
+echo "Time over."
+sleep 1s
+adb pull /sdcard/tmp.mp4

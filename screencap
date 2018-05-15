@@ -1,0 +1,7 @@
+#!/bin/bash
+DATE=`date '+%Y%m%d%H%M%S'`
+filename="Screenshot_$DATE${RANDOM:0:1}.png"
+echo "screencapping..."
+adb shell screencap /sdcard/tmp.png
+adb pull /sdcard/tmp.png $filename>/dev/null
+echo "$filename saved."
