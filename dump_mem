@@ -1,0 +1,37 @@
+#!/bin/bash
+heap_dump_location='/data/local/tmp/tmp.hprof'
+pull_file_name=""
+
+isDumpDone() {
+  while read line
+	do
+    res=$(echo $line|grep 'dumpHeapFinished')
+    if [[ "$res" ]]
+    then
+      echo "dump heap finished."
+      pull_heap_dump
+    fi
+	done
+}
+
+dump_heap() {
+  echo "dumpping memory for $1 ..."
+  task=`adb shell ps|grep "$1"`
+  if [[ "$task" == "" ]]
+  then
+    echo "Not found. Is it running ?"
+    exit
+  fi
+  pull_file_name="dump_$1.hprof"
+  pid=$(echo $task|egrep "\s[0-9]+\s" -o|head -1)
+  adb shell "am dumpheap $pid $heap_dump_location"
+  adb logcat|egrep "$pid"|isDumpDone
+}
+
+pull_heap_dump() {
+  adb pull $heap_dump_location $pull_file_name
+}
+
+adb logcat -c
+sleep 1s
+dump_heap $1
