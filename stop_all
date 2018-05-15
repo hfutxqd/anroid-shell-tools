@@ -1,0 +1,47 @@
+#!/bin/bash
+root="n"
+
+forceStop() {
+    package=$(echo $1|egrep "([a-zA-Z_0-9\-]+\.)+[a-zA-Z_0-9\-]+" -o)
+    echo "stopping $package"
+    adb shell "am force-stop $package"
+}
+
+killApp() {
+    adb shell "kill -9 $1"
+}
+
+killApps() {
+    lines=$(</dev/stdin)
+    IFS=$'\n'
+    for line in $lines    
+    do
+        pid=$(echo $line|egrep "\s[0-9]+\s" -o|head -1)
+        package=$(echo $line|egrep "\s\S+$" -o|head -1)
+        if [[ "$root" == "y" ]]
+        then
+            killApp $pid
+        else
+            forceStop $package
+        fi
+    done
+}
+
+while getopts "r" opt; do  
+	case $opt in  
+		r)
+		root="y"
+		;;
+		\?)  
+		echo "Invalid option: $OPTARG"
+        exit
+		;;
+	esac
+done  
+if [[ "$root" == "y" ]]
+then
+    adb root
+fi
+IFS=
+tasks=$(adb shell ps|egrep "u[0-9]+_[a-zA-Z0-9]+\s+[0-9]+\s+[0-9]+\s+[0-9]+\s+[0-9]+\s+\S+\s+\S+\s+\S+\s+\S+" -o)
+echo $tasks|killApps
