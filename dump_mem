@@ -1,6 +1,7 @@
 #!/bin/bash
 heap_dump_location='/data/local/tmp/tmp.hprof'
 pull_file_name=""
+dump_pid=""
 
 isDumpDone() {
   while read line
@@ -15,23 +16,47 @@ isDumpDone() {
 }
 
 dump_heap() {
-  echo "dumpping memory for $1 ..."
-  task=`adb shell ps|grep "$1"`
+  dump_pid=$$
+  package=`toRegString $1`
+  task=`adb shell ps|grep "$package$"`
+  echo $task
   if [[ "$task" == "" ]]
   then
-    echo "Not found. Is it running ?"
+    echo "Process not found. Is it running ?"
     exit
   fi
-  pull_file_name="dump_$1.hprof"
+  echo "dumpping memory for $1 ..."
+  echo "if not respond for long time, please do some operation on device."
+  pull_file_name="heap_dump_$1.hprof"
   pid=$(echo $task|egrep "\s[0-9]+\s" -o|head -1)
   adb shell "am dumpheap $pid $heap_dump_location"
   adb logcat|egrep "$pid"|isDumpDone
 }
 
-pull_heap_dump() {
-  adb pull $heap_dump_location $pull_file_name
+checkPackage() {
+  if [[ "$1" =~ ([a-zA-Z_0-9\-]+\.)+[a-zA-Z_0-9\-]+ ]]
+  then
+    echo "package is legal."
+  else
+    echo "package is illegal."
+    exit
+  fi
 }
 
+toRegString() {
+  input=$1
+  echo ${input//'.'/'\.'}
+}
+
+pull_heap_dump() {
+  adb pull $heap_dump_location $pull_file_name
+  kill -9 $dump_pid >/dev/null
+  exit
+}
+
+checkPackage $1
 adb logcat -c
+adb logcat -g 0k
 sleep 1s
+adb shell "rm /data/local/tmp/tmp.hprof"
 dump_heap $1
